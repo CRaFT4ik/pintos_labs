@@ -45,4 +45,8 @@ bool readdir (int fd, char name[READDIR_MAX_LEN + 1]);
 bool isdir (int fd);
 int inumber (int fd);
 
+/* Eldar's syscalls. Coded by Eldar. */
+void memstat(int buffer[3]);
+void fsinfo(int buffer[4]);
+
 #endif /* lib/user/syscall.h */

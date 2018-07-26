@@ -1,5 +1,6 @@
 /*
-  File for 'hair' task implementation.
+  Implemented by Eldar Timraleev, 2017.
+  Solution by semaphores;
 */
 
 #include <stdio.h>
@@ -9,23 +10,50 @@
 #include "threads/synch.h"
 #include "devices/timer.h"
 
+struct semaphore chair;     // Кресло. На нем спит парикмахер.
+struct semaphore clients;   // Очередь клиентов.
+int clients_count;
+bool sleeping;
+
 static void init(void)
 {
-    // Not implemented.
+    sema_init(&chair, 0);
+    sema_init(&clients, 0);
+
+    clients_count = 0;
+    sleeping = 0;
 }
 
 static void hairdresser(void* arg UNUSED)
 {
-    msg("hairdresser created.");
+    msg("Создан парикмахер.");
 
-    // Not implemented.
+    while (true)
+    {
+        msg("Парикмахер уснул.");
+        sleeping = 1;
+        sema_down(&chair);
+        sleeping = 0;
+        msg("Парикмахер разбужен.");
+        while (clients_count)
+        {
+            msg("Начал обслуживать клиента [%d].", timer_ticks());
+            timer_sleep(10);
+            sema_up(&clients);
+        }
+    }
 }
 
 static void client(void* arg UNUSED)
 {
-    msg("client %d created.", (int) arg);
+    msg("Клиент %d создан.", (int) arg);
 
-    // Not implemented.
+    clients_count++;
+    if (sleeping) sema_up(&chair);
+
+    sema_down(&clients);
+    msg(" * %s обслужен [%d].", thread_name(), timer_ticks());
+    clients_count--;
 }
 
 void test_hair(unsigned int num_clients, unsigned int interval)

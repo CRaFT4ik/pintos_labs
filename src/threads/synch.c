@@ -42,7 +42,7 @@
    - up or "V": increment the value (and wake up one waiting
      thread, if any). */
 void
-sema_init (struct semaphore *sema, unsigned value) 
+sema_init (struct semaphore *sema, unsigned value)
 {
   ASSERT (sema != NULL);
 
@@ -58,21 +58,23 @@ sema_init (struct semaphore *sema, unsigned value)
    interrupts disabled, but if it sleeps then the next scheduled
    thread will probably turn interrupts back on. */
 void
-sema_down (struct semaphore *sema) 
+sema_down (struct semaphore *sema)
 {
-  enum intr_level old_level;
+    enum intr_level old_level;
 
-  ASSERT (sema != NULL);
-  ASSERT (!intr_context ());
+    ASSERT (sema != NULL);
+    ASSERT (!intr_context ());
 
-  old_level = intr_disable ();
-  while (sema->value == 0) 
+    old_level = intr_disable ();
+    while (sema->value == 0)
     {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
-      thread_block ();
+        list_push_back (&sema->waiters, &thread_current ()->elem);
+        sort_thread_list(&sema->waiters); // coded by Eldar
+//printf("%s блокируется\n", list_entry(list_front(&sema->waiters), struct thread, elem)->name);
+        thread_block ();
     }
-  sema->value--;
-  intr_set_level (old_level);
+    sema->value--;
+    intr_set_level (old_level);
 }
 
 /* Down or "P" operation on a semaphore, but only if the
@@ -81,7 +83,7 @@ sema_down (struct semaphore *sema)
 
    This function may be called from an interrupt handler. */
 bool
-sema_try_down (struct semaphore *sema) 
+sema_try_down (struct semaphore *sema)
 {
   enum intr_level old_level;
   bool success;
@@ -89,10 +91,10 @@ sema_try_down (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (sema->value > 0) 
+  if (sema->value > 0)
     {
       sema->value--;
-      success = true; 
+      success = true;
     }
   else
     success = false;
@@ -105,19 +107,28 @@ sema_try_down (struct semaphore *sema)
    and wakes up one thread of those waiting for SEMA, if any.
 
    This function may be called from an interrupt handler. */
-void
-sema_up (struct semaphore *sema) 
+void sema_up(struct semaphore *sema)
 {
-  enum intr_level old_level;
+     /* coded by Eldar */
+     enum intr_level old_level;
+     bool must_unblock = false;
 
-  ASSERT (sema != NULL);
+     ASSERT (sema != NULL);
 
-  old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
-  sema->value++;
-  intr_set_level (old_level);
+     old_level = intr_disable();
+     sema->value++;
+
+     if (!list_empty(&sema->waiters))
+     {
+         sort_thread_list(&sema->waiters);
+//printf("%s разблокируется\n", list_entry(list_front(&sema->waiters), struct thread, elem)->name);
+         thread_unblock (list_entry(list_pop_front(&sema->waiters), struct thread, elem));
+         must_unblock = true;
+     }
+
+     intr_set_level(old_level);
+     if (must_unblock && !intr_context()) thread_yield();
+     /* coded by Eldar : end */
 }
 
 static void sema_test_helper (void *sema_);
@@ -126,7 +137,7 @@ static void sema_test_helper (void *sema_);
    between a pair of threads.  Insert calls to printf() to see
    what's going on. */
 void
-sema_self_test (void) 
+sema_self_test (void)
 {
   struct semaphore sema[2];
   int i;
@@ -135,7 +146,7 @@ sema_self_test (void)
   sema_init (&sema[0], 0);
   sema_init (&sema[1], 0);
   thread_create ("sema-test", PRI_DEFAULT, sema_test_helper, &sema);
-  for (i = 0; i < 10; i++) 
+  for (i = 0; i < 10; i++)
     {
       sema_up (&sema[0]);
       sema_down (&sema[1]);
@@ -145,12 +156,12 @@ sema_self_test (void)
 
 /* Thread function used by sema_self_test(). */
 static void
-sema_test_helper (void *sema_) 
+sema_test_helper (void *sema_)
 {
   struct semaphore *sema = sema_;
   int i;
 
-  for (i = 0; i < 10; i++) 
+  for (i = 0; i < 10; i++)
     {
       sema_down (&sema[0]);
       sema_up (&sema[1]);
@@ -196,8 +207,17 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  /* coded by Eldar */
+
+  while (lock->holder != NULL && lock->holder->priority < thread_current()->priority)
+      thread_priority_yield(lock);
+
+  /* coded by Eldar : end */
+
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
+
+  thread_try_return_priorities(lock);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -226,32 +246,84 @@ lock_try_acquire (struct lock *lock)
    make sense to try to release a lock within an interrupt
    handler. */
 void
-lock_release (struct lock *lock) 
+lock_release (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+
+  /* coded by Eldar */
+  thread_try_return_priorities(lock);
 }
 
 /* Returns true if the current thread holds LOCK, false
    otherwise.  (Note that testing whether some other thread holds
    a lock would be racy.) */
 bool
-lock_held_by_current_thread (const struct lock *lock) 
+lock_held_by_current_thread (const struct lock *lock)
 {
   ASSERT (lock != NULL);
 
   return lock->holder == thread_current ();
 }
-
+
 /* One semaphore in a list. */
-struct semaphore_elem 
-  {
+struct semaphore_elem
+{
     struct list_elem elem;              /* List element. */
     struct semaphore semaphore;         /* This semaphore. */
-  };
+
+    /* coded by Eldar */
+    struct thread *holder;              /* Holder of this semaphore. */
+};
+
+/* coded by Eldar */
+
+/* Указывает, как правильно сортировать список потоков, ожидающих переменную-условие.
+   Обращается к потокам-держателям A и B данных семафоров a и b и сравнивает их значения CPU burst.
+   Сортировка происходит так, что элементы списка расставляются по возрастанию значений CPU burst. */
+static bool cond_list_less_CPU_burst(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+    struct thread *A, *B;
+
+    ASSERT (a != NULL && b != NULL);
+
+    A = list_entry(a, struct semaphore_elem, elem)->holder;
+    B = list_entry(b, struct semaphore_elem, elem)->holder;
+
+    return (A->CPU_burst < B->CPU_burst);
+}
+
+/* Указывает, как правильно сортировать список потоков, ожидающих переменную-условие.
+   Обращается к потокам-держателям A и B данных семафоров a и b и сравнивает их значения приоритета.
+   Сортировка происходит так, что элементы списка расставляются по убыванию значений приоритета. */
+static bool cond_list_more_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+    struct thread *A, *B;
+
+    ASSERT (a != NULL && b != NULL);
+
+    A = list_entry(a, struct semaphore_elem, elem)->holder;
+    B = list_entry(b, struct semaphore_elem, elem)->holder;
+
+    return (A->priority > B->priority);
+}
+
+/* Сортирует список потоков, ожидающих переменную-условие по убыванию значений CPU burst
+   и по возрастанию приоритетов.
+   Первым при сигнале переменной-условия должен проснуться поток с наибольшим приоритетом и наименьшим CPU burst.
+   Поскольку при срабатывании сигнала первым пробуждают поток из начала списка, необходима его сортировка. */
+static void sort_cond_list(struct list *_list)
+{
+    if (list_empty(_list)) return;
+
+    list_sort(_list, cond_list_less_CPU_burst, NULL);
+    list_sort(_list, cond_list_more_priority, NULL);
+}
+
+/* coded by Eldar : end */
 
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
@@ -285,7 +357,7 @@ cond_init (struct condition *cond)
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
 void
-cond_wait (struct condition *cond, struct lock *lock) 
+cond_wait (struct condition *cond, struct lock *lock)
 {
   struct semaphore_elem waiter;
 
@@ -293,9 +365,15 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
-  
+
   sema_init (&waiter.semaphore, 0);
   list_push_back (&cond->waiters, &waiter.elem);
+
+  /* coded by Eldar */
+  waiter.holder = thread_current();
+  sort_cond_list(&cond->waiters);
+  /* coded by Eldar : end */
+
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
@@ -309,16 +387,18 @@ cond_wait (struct condition *cond, struct lock *lock)
    make sense to try to signal a condition variable within an
    interrupt handler. */
 void
-cond_signal (struct condition *cond, struct lock *lock UNUSED) 
+cond_signal (struct condition *cond, struct lock *lock UNUSED)
 {
   ASSERT (cond != NULL);
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
 
-  if (!list_empty (&cond->waiters)) 
-    sema_up (&list_entry (list_pop_front (&cond->waiters),
-                          struct semaphore_elem, elem)->semaphore);
+  if (!list_empty (&cond->waiters))
+  {
+      sort_cond_list(&cond->waiters);
+      sema_up (&list_entry (list_pop_front (&cond->waiters), struct semaphore_elem, elem)->semaphore);
+  }
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
@@ -328,7 +408,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
    make sense to try to signal a condition variable within an
    interrupt handler. */
 void
-cond_broadcast (struct condition *cond, struct lock *lock) 
+cond_broadcast (struct condition *cond, struct lock *lock)
 {
   ASSERT (cond != NULL);
   ASSERT (lock != NULL);

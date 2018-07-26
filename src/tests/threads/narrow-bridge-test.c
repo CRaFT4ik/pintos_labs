@@ -63,7 +63,7 @@ unsigned int threads_count(void)
     intr_set_level (old_level);
     return cnt;
 }
-  
+
 void wait_threads()
 {
   while(1)
@@ -109,15 +109,16 @@ void thread_emergency_right(void* arg UNUSED)
 
 void one_vehicle(enum car_priority prio, enum car_direction dir)
 {
+// printf("%s %s created\n", thread_name(), prio == car_emergency ? "emer" : "norm");
     arrive_bridge(prio, dir);
     cross_bridge(prio, dir);
     exit_bridge(prio, dir);
 }
-                                                                
+
 void cross_bridge(enum car_priority prio, enum car_direction dir)
 {
-    msg("Vehicle: %4s, prio: %s, direct: %s, ticks=%4llu", 
-          thread_current()->name, 
+    msg("Vehicle: %4s, prio: %s, direct: %s, ticks=%4llu",
+          thread_current()->name,
           prio == car_emergency ? "emer" : "norm",
           dir == dir_left ? "l -> r" : "l <- r",
           (unsigned long long) timer_ticks ());
