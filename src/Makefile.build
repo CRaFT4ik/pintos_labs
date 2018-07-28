@@ -25,6 +25,7 @@ threads_SRC += threads/malloc.c		# Subpage allocator.
 # Eldar's code.
 threads_SRC += threads/alarm.c
 threads_SRC += threads/planner.c
+threads_SRC += threads/file.c
 
 # Device driver code.
 devices_SRC  = devices/pit.c		# Programmable interrupt timer chip.

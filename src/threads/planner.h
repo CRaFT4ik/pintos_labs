@@ -1,11 +1,14 @@
 /* Coded by Arina. */
 
+#ifndef PLANNER_H
+#define PLANNER_H
+
 #include <devices/rtc.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "threads/malloc.h"
+#include <stdio.h>
 #include "threads/interrupt.h"
+#include "threads/malloc.h"
 #include "threads/io.h"
 
 struct task
@@ -18,3 +21,5 @@ struct task
 void add_task(char *, char *);
 time_t get_local_time(void);
 void planner_init(void);
+
+#endif
