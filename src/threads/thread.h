@@ -112,9 +112,9 @@ struct thread
     struct semaphore life;              /* Пользовательская программа не завершится, пока семафор установлен на 0. */
     tid_t parent_tid;                   /* ID порождающего процесса. */
     int wait_info[2];                   /* var[0] - установлено ли ожидание завершения для данного процесса (1 - да); var[1] - код завершения (по умолчанию 0). */
-
-    struct list open_files;             /* Список открытых файлов. */
 #endif
+
+	struct list open_files;             /* Список открытых файлов. */
     /* coded by Eldar : end */
 
     /* Owned by thread.c. */
