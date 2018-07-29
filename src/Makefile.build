@@ -24,8 +24,6 @@ threads_SRC += threads/malloc.c		# Subpage allocator.
 
 # Eldar's code.
 threads_SRC += threads/alarm.c
-threads_SRC += threads/planner.c
-threads_SRC += threads/file.c
 
 # Device driver code.
 devices_SRC  = devices/pit.c		# Programmable interrupt timer chip.
@@ -65,6 +63,10 @@ userprog_SRC += userprog/exception.c	# User exception handler.
 userprog_SRC += userprog/syscall.c	# System call handler.
 userprog_SRC += userprog/gdt.c		# GDT initialization.
 userprog_SRC += userprog/tss.c		# TSS management.
+
+# Arina's code.
+userprog_SRC += userprog/file.c
+userprog_SRC += userprog/planner.c
 
 # No virtual memory code yet.
 #vm_SRC = vm/file.c			# Some file.

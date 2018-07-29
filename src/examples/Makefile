@@ -6,7 +6,7 @@ SRCDIR = ..
 PROGS = cat cmp cp echo halt hex-dump ls mcat mcp mkdir pwd rm shell \
 	bubsort insult lineup matmult recursor \
     nodnok rndgen knight hanoi snconv sortdig checkseq subsets nsum kjump queen primes \
-    editor calc translate replace digset iplog loops bgrun psinfo memstat fsinfo
+    editor calc translate replace digset iplog loops bgrun psinfo memstat fsinfo planner_add
 
 cat_SRC = cat.c
 cmp_SRC = cmp.c
@@ -51,6 +51,8 @@ bgrun_SRC = bgrun.c
 psinfo_SRC = psinfo.c
 memstat_SRC = memstat.c
 fsinfo_SRC = fsinfo.c
+
+planner_add_SRC = planner_add.c
 
 include $(SRCDIR)/Make.config
 include $(SRCDIR)/Makefile.userprog

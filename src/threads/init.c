@@ -28,6 +28,8 @@
 #include "userprog/gdt.h"
 #include "userprog/syscall.h"
 #include "userprog/tss.h"
+#include "userprog/file.h"		// Сoded by Arina.
+#include "userprog/planner.h"	// Сoded by Arina.
 #else
 #include "tests/threads/tests.h"
 #endif
@@ -37,7 +39,6 @@
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
 #endif
-#include "threads/planner.h"
 
 /* Page directory with kernel mappings only. */
 uint32_t *init_page_dir;
@@ -111,7 +112,6 @@ main (void)
   timer_init ();
   kbd_init ();
   input_init ();
-  planner_init(); // Coded by Arina.
 #ifdef USERPROG
   exception_init ();
   syscall_init ();
@@ -129,21 +129,13 @@ main (void)
   filesys_init (format_filesys);
 #endif
 
-  printf ("Boot complete.\n");
-
   /* Coded by Arina. */
-  /*char bufn[512], buft[512];
-  snprintf(bufn, sizeof(bufn), "Arina1");
-  snprintf(buft, sizeof(buft),"1999:05:05:15:02:00");
-  add_task(bufn, buft);
+#ifdef USERPROG
+  file_init();
+  planner_init();
+#endif
 
-  snprintf(bufn, sizeof(bufn), "Arina0");
-  snprintf(buft, sizeof(buft),"1999:05:05:15:01:59");
-  add_task(bufn, buft);
-
-  snprintf(bufn, sizeof(bufn), "Arina2");
-  snprintf(buft, sizeof(buft), "1999:05:05:15:02:01");
-  add_task(bufn, buft); */
+  printf ("Boot complete.\n");
 
   /* Run actions specified on kernel command line. */
   run_actions (argv);

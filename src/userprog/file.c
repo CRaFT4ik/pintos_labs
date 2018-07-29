@@ -1,21 +1,9 @@
-#include "threads/file.h"
-#include <stdio.h>
-#include <syscall-nr.h>
-#include "threads/interrupt.h"
-#include "threads/thread.h"
-#include "threads/vaddr.h"
-#include "lib/string.h"
-#include <lib/user/syscall.h>
-#include "devices/shutdown.h"
+#include "userprog/file.h"
 #include "devices/input.h"
+#include "process.h"
 #include "filesys/file.h"
-#include <filesys/filesys.h>
+#include "filesys/filesys.h"
 #include "threads/malloc.h"
-#include "threads/palloc.h"
-#include "threads/loader.h"
-#include "devices/block.h"
-#include <filesys/inode.h>
-#include <filesys/directory.h>
 
 struct fd_elem
 {
@@ -26,15 +14,22 @@ struct fd_elem
 };
 
 static struct list file_list;
+static struct lock file_lock;
 
 static struct file *find_file_by_fd(int fd);
 static struct fd_elem *find_fd_elem_by_fd(int fd);
 static struct fd_elem *find_fd_elem_by_fd_in_process(int fd);
 
+void file_init(void)
+{
+	list_init(&file_list);
+	lock_init(&file_lock);
+}
+
 /* Создает новый файл с именем file и размером initial_size.
    Возвращает “true”, если файл успешно создан, и “false” в
    противном случае. */
-bool create(const char *file, unsigned initial_size)
+bool fcreate(const char *file, unsigned initial_size)
 {
     ASSERT (file != NULL);
     return filesys_create(file, initial_size);
@@ -42,7 +37,7 @@ bool create(const char *file, unsigned initial_size)
 
 /* Удаляет файл с указанным именем с диска. Если файл не
    существует — возвращает false. */
-bool remove(const char *file)
+bool fremove(const char *file)
 {
     if (file == NULL) return false;
 
@@ -52,7 +47,7 @@ bool remove(const char *file)
 /* Открывает файл с именем file. Возвращает
    целочисленное значение дескриптора файла fd или -1,
    если файл не может быть открыт. */
-int open(const char *file_name)
+int fopen(const char *file_name)
 {
     static int fid_count = 2;
 
@@ -83,7 +78,7 @@ int open(const char *file_name)
 }
 
 /* Возвращает размер открытого файла в байтах. */
-int filesize(int fd)
+int fsize(int fd)
 {
     struct file *file;
 
@@ -99,13 +94,12 @@ int filesize(int fd)
 
    fd=0 выполняет чтение с клавиатуры с помощью
    функции input_getc(), определенной в devices/input.h. */
-int read(int fd, void *buffer, unsigned size)
+int fread(int fd, void *buffer, unsigned size)
 {
     struct file *file;
     int ret_value = -1;
 
-    enum intr_level old_level = intr_disable();
-
+    lock_acquire(&file_lock);
     if (fd == STDIN_FILENO) // Чтение с клавиатуры.
     {
         for (unsigned i = 0; i != size; ++i)
@@ -114,6 +108,7 @@ int read(int fd, void *buffer, unsigned size)
         goto end;
     } else if (fd == STDOUT_FILENO) // Вывод в консоль. Данная функция не производит этого действия.
     {
+		lock_release(&file_lock);
         goto end;
     } else
     {
@@ -122,24 +117,25 @@ int read(int fd, void *buffer, unsigned size)
         ret_value = file_read(file, buffer, size);
     }
 
-    end: intr_set_level(old_level);
+    end: lock_release(&file_lock);
     return ret_value;
 }
 
 /* Записывает size байт в файл с дескриптором fd.
    Возвращает число записанных байт или -1, если запись в
    файл невозможна. */
-int write(int fd, const void *buffer, unsigned size)
+int fwrite(int fd, const void *buffer, unsigned size)
 {
     struct file *file;
     int ret_value = -1;
 
-    enum intr_level old_level = intr_disable();
+    lock_acquire(&file_lock);
     if (fd == STDOUT_FILENO) // Вывод в консоль.
     {
         putbuf(buffer, size);
     } else if (fd == STDIN_FILENO) // Чтение с клавиатуры. Данная функция не производит этого действия.
     {
+		lock_release(&file_lock);
         goto end;
     } else
     {
@@ -148,14 +144,14 @@ int write(int fd, const void *buffer, unsigned size)
         ret_value = file_write(file, buffer, size);
     }
 
-    end: intr_set_level(old_level);
+    end: lock_release(&file_lock);
     return ret_value;
 }
 
 /* Закрывает файл с дескриптором fd. Если программа
    пытается закрыть выходной поток (fd=1) то, ядро должно
    завершить ее с ошибкой (код выхода -1). */
-void close(int fd)
+void fclose(int fd)
 {
     struct fd_elem *fde = NULL;
 
