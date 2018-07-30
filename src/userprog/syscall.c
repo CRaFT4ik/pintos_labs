@@ -19,6 +19,7 @@
 #include "devices/block.h"
 #include "filesys/inode.h"
 #include "filesys/directory.h"
+#include "userprog/planner.h" // Coded by Arina.
 
 static void syscall_handler(struct intr_frame *);
 
@@ -48,6 +49,7 @@ bool isdir(int);
 int inumber(int);
 void memstat(int buffer[3]);
 void fsinfo(int buffer[3]);
+int planner_add(const char *name, const char *time);
 
 #define vec_size 64
 typedef int (*sys_func) (uint32_t, uint32_t, uint32_t); // Объявление типа sys_func, который определяет вызываемую функцию и ее параметры.
@@ -93,6 +95,9 @@ void syscall_init(void)
     /* Eldar's syscalls. */
     vector[SYS_MEMSTAT]		= (sys_func) memstat;
     vector[SYS_FSINFO]		= (sys_func) fsinfo;
+
+	/* Arina's syscalls. */
+	vector[SYS_PLANNER]		= (sys_func) planner_add;
 
     list_init(&file_list);
     lock_init(&file_lock);
@@ -482,4 +487,51 @@ void fsinfo(int buffer[5])
     buffer[1] = block_size(fs_device) * BLOCK_SECTOR_SIZE;
     buffer[2] = size;
     buffer[3] = buffer[1] - buffer[2];
+}
+
+/* Coded by Arina. */
+
+/* Добавляет задачу в планировщик.
+    * NAME - путь (имя) использняемой программы;
+	* TIME - время запуска в формате: ГГГГ:ММ:ДД:чч:мм:сс.
+   Возвращает:
+    * 0 в случае успеха;
+	* -1 в случае неудачи по различным причинам;
+	* -2 в случае неудачи по причине неверного формата. */
+int planner_add(const char *name, const char *time)
+{
+	if (name == NULL || !is_user_vaddr(name) || time == NULL || !is_user_vaddr(time))
+	    goto unknown;
+	
+	if (strlen(time) != 19 || strlen(name) < 3 || strlen(name) > 127) goto wrong_format;
+	for (int i = 0; i < strlen(time); i++)
+	{
+		switch (i)
+		{
+			case 4:
+			case 7:
+			case 10:
+			case 13:
+			case 16:
+				if (time[i] != ':') goto wrong_format;
+				continue;
+		}
+
+		if (!('0' <= time[i] && time[i] <= '9')) goto wrong_format;
+	}
+
+	if (planner_add_task(name, time) == 0)
+	{
+		printf("Task '%s %s' added successfully!\n", name, time);
+		return 0;
+	} else
+	{
+		printf("Unexpected error while adding task.\n");
+		goto unknown;
+	}
+
+	unknown:
+	return -1;
+	wrong_format:
+	return -2;
 }

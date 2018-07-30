@@ -49,4 +49,7 @@ int inumber (int fd);
 void memstat(int buffer[3]);
 void fsinfo(int buffer[4]);
 
+/* Arina's syscalls. Coded by Arina. */
+int planner_add(const char *name, const char *time);
+
 #endif /* lib/user/syscall.h */
