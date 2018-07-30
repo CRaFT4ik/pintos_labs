@@ -35,5 +35,6 @@
 `pintos --qemu --disk=filesys.dsk -p ../examples/planner_add -a planner_add -- -q`
 
 Добавить задачу в планировщик через пользовательскую программу:  
+Формат имени $NAME: `name arg0 arg1 ... argN`  
 Формат времени $TIME: `ГГГГ:ММ:ДД:чч:мм:сс`  
 `pintos --qemu --disk=filesys.dsk -- -q run 'planner_add $NAME $TIME'`

@@ -194,3 +194,10 @@ void fsinfo(int buffer[4])
 {
     syscall1(SYS_FSINFO, buffer);
 }
+
+/* Arina's syscalls. Coded by Arina. */
+
+int planner_add(const char *name, const char *time)
+{
+	return syscall2(SYS_PLANNER, name, time);
+}

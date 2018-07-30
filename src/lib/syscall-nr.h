@@ -30,10 +30,13 @@ enum
     SYS_ISDIR,                  /* Tests if a fd represents a directory. */
     SYS_INUMBER,                /* Returns the inode number for a fd. */
 
-    /* coded by Eldar */
-    /* Eldar's vectors */
+    /* Coded by Eldar. */
+    /* Eldar's vectors. */
     SYS_MEMSTAT,                /* Собирает информацию о RAM. */
-    SYS_FSINFO                  /* Собирает информацию о файловой системе. */
+    SYS_FSINFO,                 /* Собирает информацию о файловой системе. */
+
+	/* Coded by Arina. */
+	SYS_PLANNER					/* Добавляет задачу в планировщик. */
   };
 
 #endif /* lib/syscall-nr.h */

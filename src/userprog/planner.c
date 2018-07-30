@@ -5,7 +5,7 @@
 #include "threads/thread.h"
 #include "devices/timer.h"
 
-void add_task_(int, char *, time_t);
+int add_task_(int, char *, time_t);
 void write_txt(void);
 void task_remove(struct task *);
 void sort_tasks(void);
@@ -69,12 +69,77 @@ s:	//add_test_tasks();
    Интервал выполнения и проверки задач - 1 раз в секунду. */
 void planner_thread(void)
 {
+	time_t cur_time;
+	char name_buf[32];
+	char *realname;
+
 	while (true)
 	{
-		//process_execute(name);
-		printf("[PLANNER DAEMON] %s %ld\n", thread_current()->name, get_local_time());
+		cur_time = get_local_time();
+		for (int i = 0; i < list_num; i++)
+		{
+			if (list[i]->time == cur_time)
+			{
+				/* Выполнение задачи. */
+				char *ptr = strstr(list[i]->name, " ");
+				if (ptr != NULL)
+				{
+					int len = ptr - list[i]->name;
+					memcpy(name_buf, list[i]->name, len);
+					name_buf[len] = '\0';
+					realname = name_buf;
+				} else
+					realname = list[i]->name;
+
+				int fd = fopen(realname);
+				if (fd == -1)
+				{
+					printf("[PLANNER DAEMON] Can't execute planned task: file not found!\n");
+					continue;
+				} else
+				{
+					fclose(fd);
+					printf("[PLANNER DAEMON] Trying execute program '%s'.\n", list[i]->name);
+					tid_t tid = process_execute(list[i]->name);
+					if (tid == TID_ERROR)
+					{
+						printf("[PLANNER DAEMON] Can't execute planned task: unable to create thread for task!\n");
+						continue;
+					}
+				}
+			} else if (list[i]->time > cur_time)
+				break;
+		}
+
+		clean_tasks(cur_time);
+		//printf("[PLANNER DAEMON] %s %ld\n", thread_current()->name, cur_time);
 		thread_sleep(TIMER_FREQ); // Интервал проверки задач таймером.
 	}
+}
+
+/* Удаляет из списка задачи, запланированное
+   время которых <= CUR_TIME. */
+void clean_tasks(time_t cur_time)
+{
+	int removed_count = 0;
+	for (int i = 0; i < list_num; i++)
+	{
+		if (list[i] != NULL && list[i]->time <= cur_time)
+		{
+			free(list[i]);
+			for (int j = i + 1; j < list_num; j++)
+			{
+				list[j - 1] = list[j];
+				list[j] = NULL;
+			}
+			removed_count++;
+			i--;
+		}
+	}
+
+	list_num -= removed_count;
+	list = realloc(list, sizeof(struct task *) * (list_num + 1));
+	write_txt();
 }
 
 void write_txt(void)
@@ -106,7 +171,7 @@ time_t get_local_time(void)
 	return rtc_get_time() + 3 * 60 * 60;
 }
 
-void add_task_(int id, char *name, time_t seconds)
+int add_task_(int id, char *name, time_t seconds)
 {
 	struct task *t = malloc(sizeof(struct task));
 	ASSERT (t != NULL);
@@ -122,11 +187,14 @@ void add_task_(int id, char *name, time_t seconds)
 	*(list + list_num++) = t;
 	sort_tasks();
 	write_txt();
+
+	return 0;
 }
 
 /* Добавляет задачу в массив спящих потоков.
-   Строка TIME имеет формат: гггг:мм:дд:чч:мм:сс. */
-void add_task(char *name, char *time)
+   Строка TIME имеет формат: ГГГГ:ММ:ДД:чч:мм:сс.
+   Вернет 0 в случае успеха. */
+int planner_add_task(char *name, char *time)
 {
 	static const int days_per_month[12] =
 	  {
@@ -163,7 +231,7 @@ void add_task(char *name, char *time)
   	sec = atoi(tmp);
     seconds += sec;
 
-	add_task_(++last_id, name, seconds);
+	return add_task_(++last_id, name, seconds);
 }
 
 void sort_tasks(void)
@@ -193,13 +261,13 @@ void add_test_tasks(void)
     char bufn[128], buft[128];
     snprintf(bufn, sizeof(bufn), "Arina_1");
     snprintf(buft, sizeof(buft),"1999:05:05:15:02:00");
-    add_task(bufn, buft);
+    planner_add_task(bufn, buft);
 
     snprintf(bufn, sizeof(bufn), "Arina_0");
     snprintf(buft, sizeof(buft),"1999:05:05:15:01:59");
-    add_task(bufn, buft);
+    planner_add_task(bufn, buft);
 
     snprintf(bufn, sizeof(bufn), "Arina_2");
     snprintf(buft, sizeof(buft), "1999:05:05:15:02:01");
-    add_task(bufn, buft);
+    planner_add_task(bufn, buft);
 }
